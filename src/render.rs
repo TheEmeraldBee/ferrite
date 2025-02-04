@@ -1,7 +1,4 @@
-use ratatui::{
-    style::Stylize,
-    widgets::{Block, List, Paragraph},
-};
+use ratatui::widgets::{Block, List, Paragraph};
 use widgetui::{Chunks, Res, ResMut, WidgetFrame, WidgetResult};
 
 use crate::{state::MakefileState, StatusChunk, TargetChunk};
@@ -15,7 +12,7 @@ pub fn render(
     frame.render_widget(
         List::new(state.targets.iter().enumerate().map(|(i, target)| {
             if state.selected == i {
-                format!(" <  {} > ", target)
+                format!(" > {} ", target)
             } else {
                 target.clone()
             }
@@ -36,7 +33,7 @@ pub fn status(
     if let Some(last) = state.last_target.clone() {
         frame.render_widget(
             Paragraph::new(format!(
-                "<jk> - Traverse Tasks, <Esc/q> -- Quit, <r> - Run Last Task ---- Last - {}",
+                "<Esc/q> - Quit, <jk> - Traverse Tasks, <r> - Run Last Task ---- Last - {}",
                 last
             ))
             .block(Block::bordered()),
@@ -44,7 +41,7 @@ pub fn status(
         );
     } else {
         frame.render_widget(
-            Paragraph::new(format!("<jk> - Traverse Tasks, <Esc/q> - Quit",))
+            Paragraph::new(format!("<Esc/q> - Quit, <jk> - Traverse Tasks",))
                 .block(Block::bordered()),
             area,
         );
