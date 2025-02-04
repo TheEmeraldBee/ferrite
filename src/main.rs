@@ -1,112 +1,20 @@
 use makefile_lossless::*;
-use ratatui::{prelude::*, widgets::*};
 use std::{
     io::{Read, Write},
     process::Command,
     sync::{Arc, Mutex},
 };
-use style::Stylize;
 use widgetui::*;
 
-#[derive(State)]
-pub struct MakefileState {
-    pub targets: Vec<String>,
-    pub run_target: Arc<Mutex<Option<String>>>,
-    pub selected: usize,
-    pub last_target: Option<String>,
-}
+mod chunks;
+mod input;
+mod render;
+mod state;
 
-pub struct TitleChunk;
-pub struct TargetChunk;
-pub struct StatusChunk;
-
-pub fn chunk(frame: Res<WidgetFrame>, mut chunks: ResMut<Chunks>) -> WidgetResult {
-    let layouts = layout![frame.size(), (%100), (#3)];
-
-    chunks.register_chunk::<TargetChunk>(layouts[0][0]);
-    chunks.register_chunk::<StatusChunk>(layouts[1][0]);
-    Ok(())
-}
-
-pub fn render(
-    mut frame: ResMut<WidgetFrame>,
-    mut events: ResMut<Events>,
-    mut state: ResMut<MakefileState>,
-    chunks: Res<Chunks>,
-) -> WidgetResult {
-    if events.key(crossterm::event::KeyCode::Char('q')) {
-        events.register_exit();
-    }
-
-    let area = chunks.get_chunk::<TargetChunk>()?;
-    frame.render_widget(
-        List::new(state.targets.iter().enumerate().map(|(i, target)| {
-            if state.selected == i {
-                format!(" <  {} > ", target)
-            } else {
-                target.clone()
-            }
-        }))
-        .block(Block::bordered().title("Ferrite")),
-        area,
-    );
-
-    let area = chunks.get_chunk::<StatusChunk>()?;
-    if let Some(last) = state.last_target.clone() {
-        frame.render_widget(
-            Paragraph::new(format!(
-                "{} - Traverse Tasks, {} - Run Last Task ---- Last - {}",
-                "<r>".light_blue(),
-                "<jk>".green(),
-                last.red()
-            ))
-            .block(Block::bordered()),
-            area,
-        );
-    } else {
-        frame.render_widget(
-            Paragraph::new(format!("<jk> - Traverse Tasks",)).block(Block::bordered()),
-            area,
-        );
-    }
-
-    if events.key(crossterm::event::KeyCode::Char('j'))
-        || events.key(crossterm::event::KeyCode::Down)
-    {
-        if state.selected < state.targets.len() - 1 {
-            state.selected += 1;
-        }
-    }
-
-    if events.key(crossterm::event::KeyCode::Char('k')) || events.key(crossterm::event::KeyCode::Up)
-    {
-        if state.selected > 0 {
-            state.selected -= 1;
-        }
-    }
-
-    if events.key(crossterm::event::KeyCode::Enter)
-        || events.key(crossterm::event::KeyCode::Char(' '))
-    {
-        state
-            .run_target
-            .lock()
-            .unwrap()
-            .replace(state.targets[state.selected].clone());
-        events.register_exit();
-    }
-    if events.key(crossterm::event::KeyCode::Char('r')) && state.last_target.is_some() {
-        state.run_target.lock().unwrap().replace(
-            state
-                .last_target
-                .clone()
-                .expect("Last Target should be some"),
-        );
-        events.register_exit();
-    }
-
-    Ok(())
-}
+use chunks::*;
+use input::*;
+use render::*;
+use state::MakefileState;
 
 fn main() -> anyhow::Result<()> {
     let last_target = match std::fs::File::open("/tmp/ferrite/target.txt") {
@@ -146,7 +54,7 @@ fn main() -> anyhow::Result<()> {
             selected: 0,
             last_target,
         })
-        .widgets((chunk, render))
+        .widgets((chunk, exit, selection, runner, status, render))
         .run()?;
 
     if let Some(target) = run_target.lock().unwrap().take() {
